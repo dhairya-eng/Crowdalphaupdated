@@ -1,3 +1,37 @@
+@"
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.dist/
+build/
+.eggs/
+
+# Virtual envs
+venv/
+.env/
+.trading_phase1/
+trading_phase1/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+.env
+llm_cache.json
+"@ | Out-File -Encoding utf8 .gitignore
+
+git add .gitignore
+git commit -m "Add .gitignore for Python, venv, and secrets"
+git push
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
