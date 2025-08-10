@@ -8,10 +8,10 @@ Saturday, August 09, 2025
 
 Fetching data 
 
-1. Reddit – Public sentiment (dhairya)
-2. Yfinance current price, historical price for 2 years, news (dhairya)
-3. Motely fool news (dhairya)
+1. Reddit – Public sentiment (dhairya) done
+2. Yfinance current price, historical price for 2 years, news (dhairya) done
+3. Motely fool news (dhairya) won't be done since it is paid service 
 4. Research about twitter (dhairya/deepak)
 5. Finhub api(deepak)
-6. New Repo Github(Dhairya)
+6. New Repo Github(Dhairya) done
 
