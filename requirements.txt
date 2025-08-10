@@ -1,0 +1,8 @@
+praw
+python-dotenv
+yfinance
+pandas
+numpy
+nltk
+requests
+beautifulsoup4
