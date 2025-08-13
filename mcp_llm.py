@@ -31,7 +31,7 @@ client = MultiServerMCPClient(
         "finnhub": {
             "command": "python",
             # Replace with absolute path to your math_server.py file
-            "args": ["/home/dizer/experiments/Crowdalphaupdated/finnhub_mcp_server.py"],
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/finnhub_mcp_server.py"],
             "transport": "stdio",
         },
         # "weather": {
@@ -39,6 +39,12 @@ client = MultiServerMCPClient(
         #     "url": "http://localhost:8000/mcp",
         #     "transport": "streamable_http",
         # }
+        "talib": {
+            "command": "python",    
+            # Replace with absolute path to your talib_mcp_server.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/talib_mcp_server.py"],
+            "transport": "stdio",   
+        },
     }
 )
 
