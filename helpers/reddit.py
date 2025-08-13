@@ -10,18 +10,56 @@ _KEYWORDS = {
     "halt": ["trading halt", "halted"],
     "fraud": ["fraud", "scandal", "sec probe", "investigation"],
 }
+from datetime import datetime, timezone
 
+def _to_epoch(val) -> float | None:
+    # Accept float/int epoch, ISO strings, or None
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        s = str(val).strip()
+        # Handle trailing 'Z' as UTC
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        # fromisoformat handles 'YYYY-MM-DDTHH:MM:SS[.fff][+/-HH:MM]'
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+def _as_opt_float(x):
+    try:
+        return None if x is None else float(x)
+    except Exception:
+        return None
+
+def _as_opt_int(x):
+    try:
+        return None if x is None else int(x)
+    except Exception:
+        return None
+
+def _as_opt_str(x):
+    try:
+        return None if x is None else str(x)
+    except Exception:
+        return None
+    
 def _minify_posts(posts: List[dict]) -> List[RedditPostMinified]:
     out: List[RedditPostMinified] = []
     for p in posts:
         out.append(
             RedditPostMinified(
-                title=p.get("title"),
-                score=p.get("score"),
-                url=p.get("url"),
-                created_utc=p.get("created_utc"),
-                sent_compound=p.get("sent_compound"),
-                subreddit=p.get("subreddit"),
+                title=_as_opt_str(p.get("title")),
+                score=_as_opt_int(p.get("score")),
+                url=_as_opt_str(p.get("url")),
+                created_utc=_to_epoch(p.get("created_utc")),   # <-- coerce to float seconds
+                sent_compound=_as_opt_float(p.get("sent_compound")),
+                subreddit=_as_opt_str(p.get("subreddit")),
             )
         )
     return out
