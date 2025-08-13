@@ -1,14 +1,21 @@
 from dataclasses import dataclass
-from datetime import datetime
-import requests
-@dataclass
-class indicators:
-    def __init__(self, rsi, sma_20, ema_20, macd, macd_signal):
-        self.rsi = rsi
-        self.sma_20 = sma_20
-        self.ema_20 = ema_20
-        self.macd = macd
-        self.macd_signal = macd_signal
+from typing import Optional, List
 
-class StockQuoteTA:
-    indicators: list[indicators]
+@dataclass
+class TAIndicatorsRow:
+    Date: str
+    Close: float
+    RSI: Optional[float]
+    SMA_20: Optional[float]
+    EMA_20: Optional[float]
+    MACD: Optional[float]
+    MACD_signal: Optional[float]
+
+@dataclass
+class TAIndicatorsFrame:
+    rows: List[TAIndicatorsRow]  # typically last N rows
+
+@dataclass
+class DerivedScores:
+    trend_score: float   # [-1..1], >0 uptrend
+    vol_score: float     # [0..1], normalized short-term vol
