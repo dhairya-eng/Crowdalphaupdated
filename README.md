@@ -21,3 +21,4 @@ Phase 2:
 Completed: Tool Calling Integration
 We’ve implemented tool calling as part of our LLM architecture Using MCP (TOOL). This enables the model to dynamically interact with external tools (e.g., APIs, databases, or custom functions) to enhance responses based on real-time data or computational functions.
 
+GPT link for my query = https://chatgpt.com/g/g-p-6897d56617588191b7fb35000a6a9ef5-crowdalpha/c/689901af-6be0-8320-922b-dfe69c36b6c7
