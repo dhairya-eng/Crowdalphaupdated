@@ -82,28 +82,34 @@ def _summarize_tool_result(tool_name: str, tool_result: Any) -> str:
 
 client = MultiServerMCPClient(
     {
-        "finnhub": {
+        # "finnhub": {
+        #     "command": "python",
+        #     # Replace with absolute path to your math_server.py file
+        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/finnhub_mcp_server.py"],
+        #     "transport": "stdio",
+        # },
+        # "talib": {
+        #     "command": "python",    
+        #     # Replace with absolute path to your talib_mcp_server.py file
+        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/talib_mcp_server.py"],
+        #     "transport": "stdio",   
+        # },
+        # "yfinance": {
+        #     "command": "python",
+        #     # Replace with absolute path to your yfinance_mcp_server.py file
+        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/yfinance_mcp_server.py"],
+        #     "transport": "stdio",
+        # },
+        # "reddit": {
+        #     "command": "python",
+        #     # Replace with absolute path to your reddit_mcp_server.py file
+        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/reddit_mcp_server.py"],
+        #     "transport": "stdio",
+        # },
+        "mlModel_MCP": {
             "command": "python",
-            # Replace with absolute path to your math_server.py file
-            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/finnhub_mcp_server.py"],
-            "transport": "stdio",
-        },
-        "talib": {
-            "command": "python",    
-            # Replace with absolute path to your talib_mcp_server.py file
-            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/talib_mcp_server.py"],
-            "transport": "stdio",   
-        },
-        "yfinance": {
-            "command": "python",
-            # Replace with absolute path to your yfinance_mcp_server.py file
-            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/yfinance_mcp_server.py"],
-            "transport": "stdio",
-        },
-        "reddit": {
-            "command": "python",
-            # Replace with absolute path to your reddit_mcp_server.py file
-            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/reddit_mcp_server.py"],
+            # Replace with absolute path to your mlModel_MCP.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/mlModel_MCP.py"],
             "transport": "stdio",
         },
     }
