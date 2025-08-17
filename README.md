@@ -15,3 +15,5 @@ Fetching data
 5. Finhub api(deepak)
 6. New Repo Github(Dhairya) done
 
+## Running the server to connect to the frontend
+uvicorn server:app --reload
