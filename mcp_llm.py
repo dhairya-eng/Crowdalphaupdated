@@ -26,19 +26,86 @@ class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
 
+
+# ---- BEGIN: compact tool result ----
+import json
+from typing import Any
+
+def _truncate_list(seq, max_len=60):
+    if not isinstance(seq, list): 
+        return seq
+    return seq[-max_len:] if len(seq) > max_len else seq
+
+def _summarize_price_history(obj: dict, max_len=60) -> str:
+    if not isinstance(obj, dict):
+        return str(obj)
+    tkr = obj.get("ticker"); tf = obj.get("timeframe"); per = obj.get("period")
+    c   = obj.get("candles", []); n_total = len(c); c = _truncate_list(c, max_len)
+    if not c: return f"[price-history] {tkr or ''} {tf or ''} {per or ''}: 0 bars"
+    first_t, last_t = c[0].get("t", "N/A"), c[-1].get("t", "N/A")
+    last = c[-1]; O,H,L,C = last.get("o"), last.get("h"), last.get("l"), last.get("c")
+    return (f"[price-history] {tkr} {tf} {per}: {len(c)} bars (from {n_total}) — "
+            f"{first_t} → {last_t}; last OHLC: O={O} H={H} L={L} C={C}")
+
+def _summarize_indicators(obj: dict, max_len=10) -> str:
+    if not isinstance(obj, dict):
+        return str(obj)
+    rows = obj.get("rows", []); n_total = len(rows); rows = _truncate_list(rows, max_len)
+    if not rows: return "[indicators] 0 rows"
+    last = rows[-1]; date = last.get("Date","N/A"); close = last.get("Close","N/A")
+    rsi = last.get("RSI_14") or last.get("RSI"); ema20 = last.get("EMA_20")
+    ema50 = last.get("EMA_50"); ema200 = last.get("EMA_200")
+    macd = last.get("MACD"); macds = last.get("MACD_signal")
+    return (f"[indicators] {len(rows)} rows (from {n_total}); "
+            f"last={date} close={close} RSI={rsi} "
+            f"EMA20={ema20} EMA50={ema50} EMA200={ema200} MACD={macd} vs {macds}")
+
+def _summarize_tool_result(tool_name: str, tool_result: Any) -> str:
+    # If adapter returned a JSON string, try to parse
+    parsed = None
+    if isinstance(tool_result, str):
+        try: parsed = json.loads(tool_result)
+        except Exception:
+            return tool_result[:800] + "…" if len(tool_result) > 800 else tool_result
+    else:
+        try: parsed = json.loads(json.dumps(tool_result, default=lambda o: getattr(o, "__dict__", str(o))))
+        except Exception: parsed = tool_result if isinstance(tool_result, dict) else {}
+
+    if isinstance(parsed, dict):
+        if "candles" in parsed:   return _summarize_price_history(parsed)
+        if "rows" in parsed:      return _summarize_indicators(parsed)
+        return f"[tool:{tool_name}] keys={list(parsed.keys())[:10]}…"
+    return str(parsed)
+# ---- END: compact tool result ----
+
+
+
 client = MultiServerMCPClient(
     {
         "finnhub": {
             "command": "python",
             # Replace with absolute path to your math_server.py file
-            "args": ["/home/dizer/experiments/Crowdalphaupdated/finnhub_mcp_server.py"],
+            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/finnhub_mcp_server.py"],
             "transport": "stdio",
         },
-        # "weather": {
-        #     # Ensure you start your weather server on port 8000
-        #     "url": "http://localhost:8000/mcp",
-        #     "transport": "streamable_http",
-        # }
+        "talib": {
+            "command": "python",    
+            # Replace with absolute path to your talib_mcp_server.py file
+            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/talib_mcp_server.py"],
+            "transport": "stdio",   
+        },
+        "yfinance": {
+            "command": "python",
+            # Replace with absolute path to your yfinance_mcp_server.py file
+            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/yfinance_mcp_server.py"],
+            "transport": "stdio",
+        },
+        "reddit": {
+            "command": "python",
+            # Replace with absolute path to your reddit_mcp_server.py file
+            "args": ["D:/OneDrive - TMEIC/Desktop/crowdalpha/Crowdalphaupdated/reddit_mcp_server.py"],
+            "transport": "stdio",
+        },
     }
 )
 
@@ -71,9 +138,11 @@ async def tool_node(state: AgentState, config: RunnableConfig):
     tools_by_name = config["metadata"]["__tools_by_name__"]
     for tool_call in state["messages"][-1].tool_calls:
         tool_result = await tools_by_name[tool_call["name"]].ainvoke(tool_call["args"])
+        summary = _summarize_tool_result(tool_call["name"], tool_result)
         outputs.append(
             ToolMessage(
-                content=json.dumps(tool_result),
+                # content=json.dumps(tool_result),
+                content=summary,
                 name=tool_call["name"],
                 tool_call_id=tool_call["id"],
             )

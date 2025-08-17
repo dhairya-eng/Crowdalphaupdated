@@ -8,7 +8,7 @@ from datetime import timedelta
 load_dotenv()
 
 FINHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-
+ 
 BASE_URL = "https://finnhub.io/api/v1"
 
 def get_x_days_ago(x: int) -> str:
