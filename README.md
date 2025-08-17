@@ -15,5 +15,12 @@ Fetching data
 5. Finhub api(deepak)
 6. New Repo Github(Dhairya) done
 
+
+Phase 2:
+1. we have completed the LLM tool calling using MCP and integrated Langgraph and Langsmith.
+Completed: Tool Calling Integration
+We’ve implemented tool calling as part of our LLM architecture Using MCP (TOOL). This enables the model to dynamically interact with external tools (e.g., APIs, databases, or custom functions) to enhance responses based on real-time data or computational functions.
+
 ## Running the server to connect to the frontend
 uvicorn server:app --reload
+
