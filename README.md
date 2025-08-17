@@ -21,3 +21,6 @@ Phase 2:
 Completed: Tool Calling Integration
 We’ve implemented tool calling as part of our LLM architecture Using MCP (TOOL). This enables the model to dynamically interact with external tools (e.g., APIs, databases, or custom functions) to enhance responses based on real-time data or computational functions.
 
+## Running the server to connect to the frontend
+uvicorn server:app --reload
+
