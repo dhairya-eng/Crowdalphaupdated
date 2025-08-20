@@ -60,52 +60,74 @@ def _summarize_indicators(obj: dict, max_len=10) -> str:
             f"last={date} close={close} RSI={rsi} "
             f"EMA20={ema20} EMA50={ema50} EMA200={ema200} MACD={macd} vs {macds}")
 
-def _summarize_tool_result(tool_name: str, tool_result: Any) -> str:
-    # If adapter returned a JSON string, try to parse
-    parsed = None
+def _summarize_tool_result(tool_name: str, tool_result: any) -> str:
+    import json
+
+    # normalize to dict if possible
     if isinstance(tool_result, str):
-        try: parsed = json.loads(tool_result)
+        try:
+            parsed = json.loads(tool_result)
         except Exception:
             return tool_result[:800] + "…" if len(tool_result) > 800 else tool_result
     else:
-        try: parsed = json.loads(json.dumps(tool_result, default=lambda o: getattr(o, "__dict__", str(o))))
-        except Exception: parsed = tool_result if isinstance(tool_result, dict) else {}
+        try:
+            parsed = json.loads(json.dumps(tool_result, default=lambda o: getattr(o, "__dict__", str(o))))
+        except Exception:
+            parsed = tool_result if isinstance(tool_result, dict) else {}
 
+    # 1) show explicit tool errors
+    if isinstance(parsed, dict) and "error" in parsed:
+        return f"[tool:{tool_name}] error: {parsed['error']}"
+
+    # 2) quick summary when prediction is present
+    if isinstance(parsed, dict) and isinstance(parsed.get("prediction"), dict):
+        pr = parsed["prediction"]
+        sym = parsed.get("symbol", "?")
+        ts  = parsed.get("asof", "")
+        hz  = parsed.get("horizon", "?")
+        if "last_price" in pr and "predicted_price" in pr:
+            return (f"{sym} last={pr['last_price']:.2f}, "
+                    f"pred(+{hz})={pr['predicted_price']:.2f} "
+                    f"({pr.get('expected_pct', 0):.2f}%); as of {ts}; "
+                    f"verdict={parsed.get('verdict','?')}")
+
+    # 3) legacy paths you already handled
     if isinstance(parsed, dict):
         if "candles" in parsed:   return _summarize_price_history(parsed)
         if "rows" in parsed:      return _summarize_indicators(parsed)
         return f"[tool:{tool_name}] keys={list(parsed.keys())[:10]}…"
     return str(parsed)
+
 # ---- END: compact tool result ----
 
 
 
 client = MultiServerMCPClient(
     {
-        # "finnhub": {
-        #     "command": "python",
-        #     # Replace with absolute path to your math_server.py file
-        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/finnhub_mcp_server.py"],
-        #     "transport": "stdio",
-        # },
-        # "talib": {
-        #     "command": "python",    
-        #     # Replace with absolute path to your talib_mcp_server.py file
-        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/talib_mcp_server.py"],
-        #     "transport": "stdio",   
-        # },
-        # "yfinance": {
-        #     "command": "python",
-        #     # Replace with absolute path to your yfinance_mcp_server.py file
-        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/yfinance_mcp_server.py"],
-        #     "transport": "stdio",
-        # },
-        # "reddit": {
-        #     "command": "python",
-        #     # Replace with absolute path to your reddit_mcp_server.py file
-        #     "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/reddit_mcp_server.py"],
-        #     "transport": "stdio",
-        # },
+        "finnhub": {
+            "command": "python",
+            # Replace with absolute path to your math_server.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/finnhub_mcp_server.py"],
+            "transport": "stdio",
+        },
+        "talib": {
+            "command": "python",    
+            # Replace with absolute path to your talib_mcp_server.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/talib_mcp_server.py"],
+            "transport": "stdio",   
+        },
+        "yfinance": {
+            "command": "python",
+            # Replace with absolute path to your yfinance_mcp_server.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/yfinance_mcp_server.py"],
+            "transport": "stdio",
+        },
+        "reddit": {
+            "command": "python",
+            # Replace with absolute path to your reddit_mcp_server.py file
+            "args": ["C:/Users/dppar/OneDrive - Virginia Tech/Desktop/Crowdalpha-DhairyaLaptop/reddit_mcp_server.py"],
+            "transport": "stdio",
+        },
         "mlModel_MCP": {
             "command": "python",
             # Replace with absolute path to your mlModel_MCP.py file

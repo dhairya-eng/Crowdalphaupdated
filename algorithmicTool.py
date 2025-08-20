@@ -1,6 +1,7 @@
-# mlModel_MCP.py
-# CrowdAlpha Technicals MCP server (no plotting): returns last price, ML forecast, features, and simple signals.
-
+import matplotlib
+matplotlib.use("Agg")      # headless backend for stdio servers
+import matplotlib.pyplot as plt
+import os, tempfile
 import sys, traceback, math
 from typing import Dict, Any, Tuple
 import numpy as np
@@ -15,20 +16,17 @@ from sklearn.linear_model import Ridge
 from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("crowdalpha_technicals")
 
-# ---------------- Utilities ----------------
-
 _INTERVAL_SEC = {
     "1m": 60, "2m": 120, "5m": 300, "15m": 900, "30m": 1800,
     "60m": 3600, "90m": 5400, "1h": 3600, "1d": 86400,
 }
 
-def _to_utc_index(df: pd.DataFrame) -> pd.DataFrame:
-    if df.index.tz is None:
-        df.index = df.index.tz_localize("UTC")
-    else:
-        df.index = df.index.tz_convert("UTC")
-    return df
-
+def _save_fig(fig) -> str:
+    tmpdir = os.environ.get("MCP_TMP_DIR", tempfile.gettempdir())
+    path = os.path.join(tmpdir, f"crowdalpha_chart_{next(tempfile._get_candidate_names())}.png")
+    fig.savefig(path, bbox_inches="tight", dpi=140)
+    plt.close(fig)
+    return path
 def _close_series(df: pd.DataFrame) -> pd.Series:
     """Return a 1-D float Series for 'close' even if df['close'] is 2-D."""
     if "close" not in df.columns:
@@ -42,7 +40,103 @@ def _close_series(df: pd.DataFrame) -> pd.Series:
     s = s.astype(float)
     s.name = "close"
     return s
+def make_bollinger_chart(df: pd.DataFrame, symbol: str) -> str:
+    px = _close_series(df)
+    mid = px.rolling(20).mean()
+    std = px.rolling(20).std(ddof=0)
+    up = mid + 2*std
+    lo = mid - 2*std
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(px, label="Close")
+    ax.plot(mid, label="Mid(20)")
+    ax.plot(up, label="Upper")
+    ax.plot(lo, label="Lower")
+    ax.set_title(f"{symbol} — Bollinger Bands (20, 2)")
+    ax.legend()
+    return _save_fig(fig)
 
+def make_rsi_chart(df: pd.DataFrame, symbol: str) -> str:
+    px = _close_series(df)
+    delta = px.diff()
+    upm = delta.clip(lower=0)
+    dnm = -delta.clip(upper=0)
+    r_up = upm.ewm(alpha=1/14, adjust=False).mean()
+    r_dn = dnm.ewm(alpha=1/14, adjust=False).mean().replace(0.0, np.nan)
+    rs = r_up / r_dn
+    rsi = 100 - (100 / (1 + rs))
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(rsi, label="RSI(14)")
+    ax.axhline(30, linestyle="--")
+    ax.axhline(70, linestyle="--")
+    ax.set_title(f"{symbol} — RSI(14)")
+    ax.legend()
+    return _save_fig(fig)
+
+def make_macd_chart(df: pd.DataFrame, symbol: str) -> str:
+    px = _close_series(df)
+    ema12 = px.ewm(span=12, adjust=False).mean()
+    ema26 = px.ewm(span=26, adjust=False).mean()
+    macd  = ema12 - ema26
+    macds = macd.ewm(span=9, adjust=False).mean()
+    hist  = macd - macds
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(macd, label="MACD")
+    ax.plot(macds, label="Signal")
+    ax.bar(hist.index, hist, width=1.0, alpha=0.5, label="Hist")
+    ax.set_title(f"{symbol} — MACD (12, 26, 9)")
+    ax.legend()
+    return _save_fig(fig)
+
+def compute_signal_series(df: pd.DataFrame) -> pd.DataFrame:
+    """Full series of buy/sell markers based on MACD cross + RSI filter."""
+    px = _close_series(df)
+    ema12 = px.ewm(span=12, adjust=False).mean()
+    ema26 = px.ewm(span=26, adjust=False).mean()
+    macd  = ema12 - ema26
+    macds = macd.ewm(span=9, adjust=False).mean()
+
+    delta = px.diff()
+    upm = delta.clip(lower=0)
+    dnm = -delta.clip(upper=0)
+    r_up = upm.ewm(alpha=1/14, adjust=False).mean()
+    r_dn = dnm.ewm(alpha=1/14, adjust=False).mean().replace(0.0, np.nan)
+    rs = r_up / r_dn
+    rsi = 100 - (100 / (1 + rs))
+
+    cross_up = (macd.shift(1) < macds.shift(1)) & (macd > macds)
+    cross_dn = (macd.shift(1) > macds.shift(1)) & (macd < macds)
+    buy  = cross_up & (rsi < 60)
+    sell = cross_dn & (rsi > 40)
+    return pd.DataFrame({"buy": buy.fillna(False), "sell": sell.fillna(False)})
+
+def make_future_chart(df: pd.DataFrame, symbol: str, predicted_price: float, H: int) -> str:
+    px = _close_series(df)
+    sigs = compute_signal_series(df)
+
+    last_ts = px.index[-1]
+    # Put the predicted point at a future x-value; for daily bars add H days.
+    fut_ts = last_ts + pd.Timedelta(days=H)
+
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(px, label="Close")
+
+    # Past buy/sell markers
+    buys  = sigs.index[sigs["buy"]]
+    sells = sigs.index[sigs["sell"]]
+    if len(buys):
+        ax.scatter(buys, px.loc[buys], marker="^", s=40, label="Buy")
+    if len(sells):
+        ax.scatter(sells, px.loc[sells], marker="v", s=40, label="Sell")
+
+    # Future predicted point
+    ax.scatter([fut_ts], [predicted_price], marker="*", s=120, label=f"Pred +{H}", zorder=5)
+    ax.set_title(f"{symbol} — Future Trend & Signals")
+    ax.legend()
+    return _save_fig(fig)
 
 def fetch_bar(symbol: str, interval: str, lookback: str, *, prepost: bool = True) -> pd.DataFrame:
     import inspect
@@ -88,8 +182,6 @@ def assert_fresh(df: pd.DataFrame, interval: str, *, max_lag_mult: float = 2.5) 
     lag_s = float((now - last_ts).total_seconds())
     tol = max_lag_mult * _INTERVAL_SEC.get(interval, 60)
     return {"last_ts": str(last_ts), "stale_seconds": lag_s, "is_stale": lag_s > tol}
-
-# ---------------- Features & Model ----------------
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     px = _close_series(df)
@@ -201,72 +293,62 @@ def compute_signals_latest(df: pd.DataFrame) -> Dict[str, float | bool]:
     rsi_val = float(rsi.iloc[-1]) if len(rsi) else float("nan")
 
     return {"macd_bull_cross": bool(macd_bull), "macd_bear_cross": bool(macd_bear), "rsi14": rsi_val}
-
-
-# ---------------- MCP Tool ----------------
-
 @mcp.tool(
-    name="analyze_technicals",
+    name="analyze_technicals_with_charts",
     description=(
-        "No-plot analysis: fetch OHLC, compute features, predict H-step log-return, "
-        "and return last price, predicted price, expected %, latest signals, and freshness."
+        "Compute MACD/Bollinger/RSI and an ML forecast; return JSON + PNG charts "
+        "(Bollinger, RSI, MACD, and Future Trend with buy/sell markers)."
     ),
 )
-def analyze_technicals(
-    symbol: str = "AAPL",           # <--- DEFAULT so it's not required
+def analyze_technicals_with_charts(
+    symbol: str = "AAPL",
     interval: str = "1d",
     lookback: str = "1y",
     horizon: int = 5,
     prepost: bool = True
 ) -> Dict[str, Any]:
-    """
-    Example:
-      analyze_technicals()                          # defaults to AAPL, 1d, 1y, H=5
-      analyze_technicals("AAPL", horizon=10)        # custom horizon
-    """
     try:
-        # Normalize inputs a bit
         symbol = (symbol or "AAPL").upper().strip()
-        interval = interval.strip()
-        lookback = lookback.strip()
-        if horizon < 1:
-            horizon = 1
+        interval = interval.strip(); lookback = lookback.strip()
+        if horizon < 1: horizon = 1
 
         df = fetch_bar(symbol, interval, lookback, prepost=prepost)
         if df.empty:
             return {"error": f"No data for {symbol} (interval={interval}, lookback={lookback})."}
 
-        fresh = assert_fresh(df, interval)
-        def _enough(d: pd.DataFrame) -> bool:
-            return len(d) >= 180  # room for 20/26 EMA warmup + 80/20 split
-
+        # ensure enough rows; auto-extend lookback if needed
+        def _enough(d: pd.DataFrame) -> bool: return len(d) >= 180
         if not _enough(df):
             for alt in ["2y", "5y", "max"]:
-                df_alt = fetch_bar(symbol, interval, alt, prepost=prepost)
-                if _enough(df_alt):
-                    df, lookback = df_alt, alt
+                dfa = fetch_bar(symbol, interval, alt, prepost=prepost)
+                if _enough(dfa):
+                    df, lookback = dfa, alt
                     break
             if not _enough(df):
-                return {"error": f"Not enough data for {symbol} with interval={interval}. Try a longer lookback (e.g., 2y/5y/max)."}
+                return {"error": f"Not enough data for {symbol} with {interval}. Try lookback=2y/5y/max."}
 
-        # Train/predict
-        try:
-            ts, yhat, feats = predict(df, horizon)
-        except Exception as e:
-            # If the typical cause is not enough rows, suggest a bigger lookback
-            msg = f"{type(e).__name__}: {e}"
-            if "Not enough aligned rows" in str(e):
-                msg += f" | Tip: try lookback='2y' or smaller horizon (got horizon={horizon})."
-            return {"error": msg}
-
-        sig = compute_signals_latest(df)
+        fresh = assert_fresh(df, interval)
+        ts, yhat, feats = predict(df, horizon)
+        sig_last = compute_signals_latest(df)
 
         exp_pct = (math.exp(yhat) - 1.0) * 100.0
-        macd_bull = bool(sig.get("macd_bull_cross", False))
-        verdict = "BUY" if (exp_pct > 0.0 and macd_bull) else ("HOLD" if abs(exp_pct) < 0.3 else "SELL")
+        verdict = "BUY" if (exp_pct > 0.0 and bool(sig_last.get("macd_bull_cross", False))) else ("HOLD" if abs(exp_pct) < 0.3 else "SELL")
 
         current_price   = float(feats["last_price"])
         predicted_price = float(feats["predicted_price"])
+
+        # ---- Charts (PNG files -> return URIs) ----
+        b_path = make_bollinger_chart(df, symbol)
+        r_path = make_rsi_chart(df, symbol)
+        m_path = make_macd_chart(df, symbol)
+        f_path = make_future_chart(df, symbol, predicted_price, horizon)
+
+        charts = [
+            {"name": f"{symbol} Bollinger", "path": b_path, "uri": f"file://{b_path}", "format": "png"},
+            {"name": f"{symbol} RSI",       "path": r_path, "uri": f"file://{r_path}", "format": "png"},
+            {"name": f"{symbol} MACD",      "path": m_path, "uri": f"file://{m_path}", "format": "png"},
+            {"name": f"{symbol} Future",    "path": f_path, "uri": f"file://{f_path}", "format": "png"},
+        ]
 
         return {
             "symbol": symbol,
@@ -276,7 +358,6 @@ def analyze_technicals(
             "asof": str(ts),
             "freshness": fresh,
 
-            # prominent, easy to read
             "current_price": current_price,
             "predicted_price": predicted_price,
 
@@ -287,16 +368,20 @@ def analyze_technicals(
                 "predicted_price": predicted_price,
             },
             "verdict": verdict,
-            "latest_signals": sig,
+            "latest_signals": sig_last,
             "features": {k: float(v) for k, v in feats.items() if k not in ("last_price", "predicted_price")},
+            "charts": charts,
+            "strategy": {
+                "entry":  "MACD bull cross + RSI<60",
+                "exit":   "MACD bear cross + RSI>40 or risk-based stop",
+                "notes":  "Markers show historical buy/sell points; star marks ML-predicted future price."
+            }
         }
-
 
     except Exception as e:
         import traceback, sys
-        traceback.print_exc(file=sys.stderr)  # log details to stderr (doesn't break stdio)
+        traceback.print_exc(file=sys.stderr)
         return {"error": f"{type(e).__name__}: {e}"}
-
 
 if __name__ == "__main__":
     # Match your existing servers’ pattern
